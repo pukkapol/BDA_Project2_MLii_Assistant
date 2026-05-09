@@ -1,74 +1,68 @@
+%%writefile app.py
 import streamlit as st
 import os
-import sys
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain.schema import Document
+from langchain.text_splitter import CharacterTextSplitter
 
-
-try:
-    import langchain
-    from langchain.chains import RetrievalQA
-    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-    from langchain_community.vectorstores import FAISS
-except ImportError as e:
-    st.error(f"❌ CRITICAL ERROR: {e}")
-    st.warning("Please ensure your requirements.txt is correctly named and contains 'langchain', 'langchain-openai', etc.")
-    st.stop()
-
-
+# --- 3.1 & 3.4 Project Info ---
 st.set_page_config(page_title="BDA_Project2_GroupNo15", layout="wide")
-st.title("🤖 BDA_Project2_yourGroupNo")
-st.markdown("### MLii Fund Smart Assistant")
+st.title("🤖 BDA_Project2_GroupNo15")
+st.markdown("### MLii Fund AI Search (No API Key Required)")
 
 st.sidebar.markdown("""
 **Group Members:**
-- ID: 6631501089 - Name: Pukkapol Kangthong
+- Student ID: 6631501089 - Name: Pukkapol Kangthong
+---
+**Model Info:**
+Using Local Multilingual-MiniLM (AI)
 """)
 
+# --- 3.2 & 3.3 Dataset & RAG Pipeline ---
+# This is your MLii Dataset
+dataset_content = """
+ขั้นตอนการขอรับทุนสนับสนุนวิจัยเพื่อพัฒนาการเรียนรู้ สถาบันนวัตกรรมการเรียนรู้ฯ
+1. ยื่นข้อเสนอโครงการ พร้อมหนังสือรับรองจากคณะกรรมการหน่วยงาน และ Concept design 
+2. เสนอคณะกรรมการวิจัยพิจารณาข้อเสนอโครงการ
+3. ทำสัญญารับเงินทุน และเบิกจ่ายเงินทุนงวดที่ 1 (ร้อยละ 50)
+4. ส่งรายงานความก้าวหน้าวิจัยเมื่อครบ 6 เดือน เบิกจ่ายเงินทุนงวดที่ 2 (ร้อยละ 30)
+5. ส่งรายงานวิจัยฉบับสมบูรณ์ ผ่านการประเมิน เบิกจ่ายเงินทุนงวดที่ 3 (ร้อยละ 20)
 
-api_key = st.sidebar.text_input("OpenAI API Key", type="password")
+งบประมาณวิจัย: ตั้งตามจริง ไม่เกิน 50,000 บาท ต่อโครงการ
+ค่าตอบแทน: เบิกได้รวมกันไม่เกิน 3,000 บาท ต่อโครงการ
+คุณสมบัติ: เป็นพนักงานเต็มเวลาไม่น้อยกว่า 1 ปี ไม่อยู่ระหว่างถูกระงับทุน
+"""
 
-
-if api_key:
-    os.environ["OPENAI_API_KEY"] = api_key
+@st.cache_resource
+def load_local_ai():
+    # 1. Initialize local Thai-supporting AI Embeddings (No Key Needed)
+    embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
     
-
-    dataset_content = """
-    ขั้นตอนการขอรับทุน MLii:
-    1. ยื่นข้อเสนอโครงการ และหนังสือรับรอง
-    2. คณะกรรมการพิจารณา
-    3. ทำสัญญารับทุน เบิกจ่ายงวดที่ 1 (50%) [cite: 103, 129]
-    4. ส่งรายงานความก้าวหน้า เบิกงวดที่ 2 (30%) [cite: 104, 115]
-    5. ส่งรายงานสมบูรณ์ เบิกงวดที่ 3 (20%) [cite: 105, 132]
+    # 2. Prepare documents
+    text_splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=50)
+    docs = [Document(page_content=dataset_content)]
+    splits = text_splitter.split_documents(docs)
     
-    งบประมาณ: ไม่เกิน 50,000 บาท ต่อโครงการ [cite: 43]
-    ค่าตอบแทนผู้วิจัย: รวมไม่เกิน 3,000 บาท [cite: 72, 107]
-    """
+    # 3. Create Local Vector Store
+    vectorstore = FAISS.from_documents(splits, embeddings)
+    return vectorstore
 
-    @st.cache_resource
-    def build_rag():
-        from langchain.text_splitter import CharacterTextSplitter
-        from langchain.schema import Document
-        
-        # Create a document from the content
-        docs = [Document(page_content=dataset_content)]
-        text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=0)
-        splits = text_splitter.split_documents(docs)
-        
-        embeddings = OpenAIEmbeddings()
-        vectorstore = FAISS.from_documents(splits, embeddings)
-        
-        llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
-        return RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=vectorstore.as_retriever())
+with st.spinner("🚀 Loading Local Thai AI Model... (This may take a minute on first run)"):
+    vectorstore = load_local_ai()
 
-    try:
-        qa_chain = build_rag()
-        st.success("✅ RAG Pipeline is active!")
+st.success("✅ Local AI System Active!")
+
+# --- UI Interaction ---
+query = st.text_input("ถามคำถามเกี่ยวกับทุน MLii (เช่น 'เบิกเงินงวดแรกได้กี่เปอร์เซ็นต์'):")
+
+if query:
+    with st.spinner("AI is analyzing context..."):
+        # Search the dataset for the most relevant answer using AI meaning
+        results = vectorstore.similarity_search(query, k=1)
         
-        query = st.text_input("ถามคำถามเกี่ยวกับทุน MLii:")
-        if query:
-            with st.spinner("Processing..."):
-                response = qa_chain.invoke(query)
-                st.info(response["result"])
-    except Exception as e:
-        st.error(f"Error: {e}")
-else:
-    st.info("Enter your API Key in the sidebar to begin.")
+        if results:
+            st.markdown("### 📢 AI Found this Answer:")
+            st.info(results[0].page_content)
+        else:
+            st.warning("ไม่พบข้อมูลที่เกี่ยวข้อง")

@@ -6,54 +6,57 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
 
-st.set_page_config(page_title="BDA_Project2_GroupNo15", page_icon="🤖")
 
-st.title("BDA_Project2_yourGroupNo")
-st.markdown("### MLii Fund Smart Assistant")
+st.set_page_config(page_title="BDA_Project2_GroupNo15", layout="centered")
+
+st.title("BDA_Project2_GroupNo15")
+st.header("MLii Fund Smart Assistant") 
+
 st.markdown("""
 **Group Members:**
-1. Student ID: 6631501089 - Name: Pukkapol Kangthong
----
+* **Student ID:** 6631501089 - **Name:** Pukkapol Kangthong
+
 """)
 
-# Setup OpenAI API Key input
-api_key = st.text_input("Enter your OpenAI API Key to start:", type="password")
+# Sidebar for API Key
+api_key = st.sidebar.text_input("OpenAI API Key", type="password")
 
 if api_key:
     os.environ["OPENAI_API_KEY"] = api_key
     
+    # 3.2 & 3.3 RAG Pipeline
     @st.cache_resource
-    def load_rag_pipeline():
-        # Load Data
+    def load_data():
+        # Using the content from your MLii Q&A and process documents 
         loader = TextLoader("mlii_dataset.txt", encoding="utf-8")
         documents = loader.load()
-        
-        # Split Text
-        text_splitter = CharacterTextSplitter(chunk_size=300, chunk_overlap=50)
+        text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
         texts = text_splitter.split_documents(documents)
         
-        # Create Embeddings & VectorStore (RAG Core)
         embeddings = OpenAIEmbeddings()
         vectorstore = FAISS.from_documents(texts, embeddings)
         
-        # Create QA Chain
         llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-        qa_chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=vectorstore.as_retriever())
-        return qa_chain
+        return RetrievalQA.from_chain_type(
+            llm=llm, 
+            chain_type="stuff", 
+            retriever=vectorstore.as_retriever()
+        )
 
     try:
-        qa_chain = load_rag_pipeline()
-        st.success("RAG Pipeline loaded successfully!")
+        qa_chain = load_data()
+        st.success("System is ready to answer questions about the MLii fund!")
+
+        user_input = st.text_input("Ask a question (e.g., 'เงินทุนงวดที่ 1 เบิกได้กี่เปอร์เซ็นต์?'):")
         
-        # User Interaction
-        query = st.text_input("ถามคำถามเกี่ยวกับทุน MLii (Ask a question about the MLii fund):")
-        if query:
-            with st.spinner("กำลังค้นหาคำตอบ..."):
-                result = qa_chain.invoke(query)
-                st.markdown("**Answer:**")
-                st.info(result['result'])
+        if user_input:
+            with st.spinner("Searching..."):
+                # Answer based on provided documents [cite: 103, 115, 132]
+                response = qa_chain.invoke(user_input)
+                st.write("### Answer:")
+                st.info(response["result"])
                 
     except Exception as e:
-        st.error(f"Error setting up RAG: {e}. Please check your API key.")
+        st.error(f"An error occurred: {e}")
 else:
-    st.warning("Please enter your API Key to initialize the RAG system.")
+    st.warning("Please enter your OpenAI API Key in the sidebar to start.")

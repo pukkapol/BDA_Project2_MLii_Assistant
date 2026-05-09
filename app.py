@@ -4,13 +4,11 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
 from langchain.text_splitter import CharacterTextSplitter
 
-# --- Project Info ---
-st.set_page_config(page_title="MLii_Assistant", layout="wide")
-st.title("🤖 MLii Fund AI Search")
+st.set_page_config(page_title="BDA_Project2_GroupNo15", layout="wide")
+st.title("🤖 BDA_Project2_GroupNo15")
 st.sidebar.markdown("**Group Members:**\n- Student ID: 6631501089\n- Name: Pukkapol Kangthong")
 
-# --- Dataset from your uploaded files ---
-# This matches the guidelines in the PDF and Q&A documents you provided.
+
 dataset_content = """
 การเบิกจ่ายเงินทุนวิจัยแบ่งเป็น 3 งวด[cite: 239, 240, 241, 242]:
 1. งวดที่ 1: ร้อยละ 50 ของทุน ภายใน 30 วันหลังทำสัญญา [cite: 240]
@@ -25,7 +23,6 @@ dataset_content = """
 
 @st.cache_resource
 def load_local_ai():
-    # Local Thai-capable AI (No API Key needed)
     embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
     text_splitter = CharacterTextSplitter(chunk_size=400, chunk_overlap=50)
     docs = [Document(page_content=dataset_content)]
